@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Weather App</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 500px;
+      margin: 40px auto;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      text-align: center;
+      background-size: cover;
+      background-position: center;
+      transition: background-image 1s ease-in-out, background-color 1s ease-in-out;
+      color: #333;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      transition: transform 0.3s ease, font-size 0.3s ease;
+    }
+
+    input[type="text"] {
+      width: 80%;
+      padding: 10px;
+      font-size: 1em;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 1em;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+      transform: scale(1.05);
+    }
+
+    button:active {
+      transform: scale(0.97);
+    }
+
+    #weather-result {
+      margin-top: 20px;
+      text-align: left;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 15px;
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      opacity: 0;
+      transition: font-size 0.3s ease, transform 0.3s ease;
+    }
+
+    #weather-result.fade-in {
+      animation: fadeIn 0.5s ease-in-out forwards;
+    }
+
+    #weather-result:hover {
+      box-shadow: 0 0 20px rgba(0, 128, 255, 0.5);
+      transform: scale(1.02);
+    }
+
+    .error {
+      color: red;
+      margin-top: 20px;
+    }
+
+    .pulse {
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.5; }
+      50% { opacity: 1; }
+      100% { opacity: 0.5; }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes vibrate {
+      0% { transform: translate(0); }
+      25% { transform: translate(2px, -2px); }
+      50% { transform: translate(-2px, 2px); }
+      75% { transform: translate(2px, 2px); }
+      100% { transform: translate(0); }
+    }
+
+    .vibrate {
+      animation: vibrate 0.3s linear;
+    }
+
+    /* Weather backgrounds */
+    body.clear {
+      background-image: url('https://i.imgur.com/hs7H2BC.jpg');
+    }
+
+    body.clouds {
+      background-image: url('https://i.imgur.com/kLwxnL6.jpg');
+    }
+
+    body.rain {
+      background-image: url('https://i.imgur.com/82Fh3qM.jpg');
+    }
+
+    body.fog {
+      background-image: url('https://i.imgur.com/ttrHepV.jpg');
+    }
+
+    body.default {
+      background-color: #f0f8ff;
+      background-image: none;
+    }
+
+    /* Hover and pop effect */
+    #weather-result p:hover {
+      font-size: 1.1em;
+      color: #007bff;
+      cursor: pointer;
+    }
+
+    #weather-result p:active {
+      transform: scale(1.05);
+    }
+  </style>
+</head>
+<body class="default">
+  <h1>🌦️ Weather App</h1>
+  <input type="text" id="city-input" placeholder="Enter city name" />
+  <button id="fetch-weather">Get Weather</button>
+  <div id="weather-result"></div>
+  <div class="error" id="error-message"></div>
+
+  <script>
+    const apiKey = 'fd5f7a556574085959bdd4bd3e6a9ee3'; // Replace with your own key
+    const fetchButton = document.getElementById('fetch-weather');
+    const cityInput = document.getElementById('city-input');
+    const weatherResult = document.getElementById('weather-result');
+    const errorMessage = document.getElementById('error-message');
+
+    function isRainExpectedToday(forecastList) {
+      const today = new Date().getDate();
+      return forecastList.some(item => {
+        const forecastDate = new Date(item.dt_txt);
+        return (
+          forecastDate.getDate() === today &&
+          item.weather.some(w => w.main.toLowerCase().includes('rain'))
+        );
+      });
+    }
+
+    function setBackground(condition) {
+      document.body.className = 'default';
+      if (condition.includes("cloud")) {
+        document.body.classList.add('clouds');
+      } else if (condition.includes("rain")) {
+        document.body.classList.add('rain');
+      } else if (condition.includes("fog") || condition.includes("mist") || condition.includes("haze")) {
+        document.body.classList.add('fog');
+      } else if (condition.includes("clear")) {
+        document.body.classList.add('clear');
+      } else {
+        document.body.classList.add('default');
+      }
+    }
+
+    fetchButton.addEventListener('click', () => {
+      const city = cityInput.value.trim();
+      weatherResult.innerHTML = '';
+      weatherResult.classList.remove('fade-in');
+      errorMessage.textContent = '';
+
+      if (!city) {
+        errorMessage.textContent = '⚠️ Please enter a city name.';
+        return;
+      }
+
+      const url = `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric`;
+
+      weatherResult.innerHTML = '<p class="pulse">⏳ Loading forecast data...</p>';
+
+      fetch(url)
+        .then(response => {
+          if (!response.ok) {
+            if (response.status === 401) {
+              throw new Error('❌ Invalid API key.');
+            } else if (response.status === 404) {
+              throw new Error('📍 City not found.');
+            } else {
+              throw new Error('⚠️ API error. Please try again later.');
+            }
+          }
+          return response.json();
+        })
+        .then(data => {
+          const now = data.list[0];
+          const weatherCondition = now.weather[0].main.toLowerCase();
+          const rainExpected = isRainExpectedToday(data.list);
+
+          setBackground(weatherCondition);
+
+          const emojiMap = {
+            clear: '☀️',
+            clouds: '☁️',
+            rain: '🌧️',
+            drizzle: '🌦️',
+            thunderstorm: '⛈️',
+            snow: '❄️',
+            mist: '🌫️',
+            haze: '🌫️',
+            fog: '🌫️'
+          };
+
+          const emoji = emojiMap[weatherCondition] || '🌈';
+
+          const weatherHtml = `
+            <h2>${emoji} Weather in ${data.city.name}, India</h2>
+            <p><strong>🌡️ Temperature:</strong> ${now.main.temp} °C</p>
+            <p><strong>🌤️ Condition:</strong> ${now.weather[0].main} - ${now.weather[0].description}</p>
+            <p><strong>💧 Humidity:</strong> ${now.main.humidity}%</p>
+            <p><strong>💨 Wind Speed:</strong> ${now.wind.speed} m/s</p>
+            <p><strong>📅 Rain Forecast:</strong> ${rainExpected ? '🌧️ Rain is expected later today.' : '☀️ No rain expected today.'}</p>
+          `;
+
+          weatherResult.innerHTML = weatherHtml;
+          void weatherResult.offsetWidth;
+          weatherResult.classList.add('fade-in');
+
+          // Vibration on touch
+          weatherResult.addEventListener('click', () => {
+            weatherResult.classList.add('vibrate');
+            setTimeout(() => weatherResult.classList.remove('vibrate'), 300);
+          });
+        })
+        .catch(error => {
+          weatherResult.innerHTML = '';
+          document.body.className = 'default';
+          errorMessage.textContent = error.message;
+        });
+    });
+  </script>
+</body>
+</html>
